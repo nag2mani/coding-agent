@@ -1,4 +1,4 @@
-# Gemma Coding Agent
+# Gemma coding agent: Without rate limits
 
 A tiny local coding agent powered by [Ollama](https://ollama.com?utm_source=chatgpt.com) that can read, edit, and run code directly on your machine using any tool-capable local LLM.
 
