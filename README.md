@@ -1,4 +1,4 @@
-# gemma coding agent
+# Gemma coding agent: Without rate limits
 
 A tiny local coding agent that runs on your machine via [Ollama](https://ollama.com) and uses any tool-capable model (default: `gemma4:e4b`) to read, edit, and run code on your behalf.
 
