@@ -1,100 +1,222 @@
 # Gemma coding agent: Without rate limits
 
-A tiny local coding agent that runs on your machine via [Ollama](https://ollama.com) and uses any tool-capable model (default: `gemma4:e4b`) to read, edit, and run code on your behalf.
+A tiny local coding agent powered by [Ollama](https://ollama.com?utm_source=chatgpt.com) that can read, edit, and run code directly on your machine using any tool-capable local LLM.
 
-No cloud API, no keys — just your local Ollama server and a single Python file.
+Default model: `gemma4:e4b`
 
-## How it works
+No cloud APIs. No API keys. No external services.
+Just:
 
-The agent uses Ollama's native tool-calling API. The model emits structured tool calls (not free-text JSON), which the agent executes locally and feeds back. The loop continues until the model returns a final text message with no more tool calls.
+* a local Ollama server
+* one Python file
+* local tools
 
-Available tools:
+---
 
-| Tool         | Purpose                                                    |
-| ------------ | ---------------------------------------------------------- |
-| `read_file`  | Read a file (with 1-based line numbers).                   |
-| `write_file` | Create a new file or overwrite an existing one.            |
-| `edit_file`  | Replace a unique substring in a file.                      |
-| `list_dir`   | List directory entries.                                    |
-| `run_bash`   | Run a shell command (60s timeout, runs in the working dir).|
+# Features
 
-All file paths are sandboxed to the working directory — the agent cannot read or write outside `AGENT_WORKDIR`.
+* Local-first coding assistant
+* Uses Ollama native tool calling
+* Reads and edits files
+* Runs shell commands
+* Sandboxed workspace access
+* Interactive REPL mode
+* One-shot task execution
+* Works with multiple tool-capable models
 
-## Prerequisites
+---
 
-- Python 3.8+
-- [Ollama](https://ollama.com/download) installed and running (`ollama serve`)
-- A tool-capable model pulled locally. Default: `gemma4:e4b`
-  ```bash
-  ollama pull gemma4:e4b
-  ```
-  Any model whose `ollama show <model>` output lists `tools` under Capabilities will work (e.g. `gemma3`, `llama3.1`, `qwen2.5-coder`).
+# Architecture
 
-## Install
+The agent uses Ollama's native tool-calling API.
+
+Instead of generating raw JSON in text, the model emits structured tool calls which are:
+
+1. Executed locally by the agent
+2. Returned back to the model
+3. Used for the next reasoning step
+
+The loop continues until the model produces a final response without additional tool calls.
+
+---
+
+# Available Tools
+
+| Tool         | Description                          |
+| ------------ | ------------------------------------ |
+| `read_file`  | Read files with 1-based line numbers |
+| `write_file` | Create or overwrite files            |
+| `edit_file`  | Replace a unique substring in a file |
+| `list_dir`   | List directory contents              |
+| `run_bash`   | Execute shell commands (60s timeout) |
+
+---
+
+# Security & Sandboxing
+
+All file operations are restricted to the configured working directory:
+
+```bash
+AGENT_WORKDIR
+```
+
+The agent cannot access files outside this directory.
+
+---
+
+# Requirements
+
+* Python 3.8+
+* [Ollama](https://ollama.com/download?utm_source=chatgpt.com) installed and running
+* A tool-capable model pulled locally
+
+Start Ollama:
+
+```bash
+ollama serve
+```
+
+Pull the default model:
+
+```bash
+ollama pull gemma4:e4b
+```
+
+Other compatible models include:
+
+* `gemma3`
+* `llama3.1`
+* `qwen2.5-coder`
+
+You can verify tool support using:
+
+```bash
+ollama show <model>
+```
+
+Look for:
+
+```text
+Capabilities:
+  tools
+```
+
+---
+
+# Installation
+
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+Minimal dependency list:
 
-**Interactive REPL:**
+```text
+ollama>=0.4.0
+```
+
+---
+
+# Usage
+
+## Interactive REPL
+
+Launch the interactive coding assistant:
 
 ```bash
 python3 agent.py
 ```
 
-```
+Example:
+
+```text
 gemma coding agent  model=gemma4:e4b  workdir=/path/to/project
-commands: /reset  /history  /workdir  /exit
 
-you ▸ summarize what's in this directory
+commands:
+  /reset
+  /history
+  /workdir
+  /exit
+
+you ▸ summarize this project
 ```
 
-**One-shot task:**
+---
+
+## One-Shot Tasks
+
+Run a single autonomous task:
 
 ```bash
-python3 agent.py "write a binary search function in search.py and a unittest for it"
+python3 agent.py "write a binary search function in search.py and add tests"
 ```
 
-**REPL commands:**
-
-| Command     | Effect                                |
-| ----------- | ------------------------------------- |
-| `/reset`    | Clear conversation history.           |
-| `/history`  | Print a compact view of the messages. |
-| `/workdir`  | Show the working directory.           |
-| `/exit`     | Quit.                                 |
-
-## Configuration
-
-All optional, via environment variables:
-
-| Variable          | Default                  | Notes                                          |
-| ----------------- | ------------------------ | ---------------------------------------------- |
-| `AGENT_MODEL`     | `gemma4:e4b`             | Any tool-capable Ollama model.                 |
-| `OLLAMA_HOST`     | `http://localhost:11434` | Point at a remote Ollama if needed.            |
-| `AGENT_WORKDIR`   | current directory        | Sandbox for all file operations.               |
-| `AGENT_MAX_STEPS` | `25`                     | Max tool-call iterations per task.             |
-
-Example — run against a different project, with a different model:
+Another example:
 
 ```bash
-AGENT_WORKDIR=~/code/myapp AGENT_MODEL=qwen2.5-coder:7b python3 agent.py
+python3 agent.py "create a FastAPI hello world app"
 ```
 
-## Example session
+---
 
+# REPL Commands
+
+| Command    | Action                        |
+| ---------- | ----------------------------- |
+| `/reset`   | Clear conversation history    |
+| `/history` | Show compact message history  |
+| `/workdir` | Show active working directory |
+| `/exit`    | Exit the agent                |
+
+---
+
+# Configuration
+
+Configuration is handled entirely through environment variables.
+
+| Variable          | Default                  | Description                  |
+| ----------------- | ------------------------ | ---------------------------- |
+| `AGENT_MODEL`     | `gemma4:e4b`             | Tool-capable Ollama model    |
+| `OLLAMA_HOST`     | `http://localhost:11434` | Ollama server endpoint       |
+| `AGENT_WORKDIR`   | Current directory        | Sandbox root directory       |
+| `AGENT_MAX_STEPS` | `25`                     | Maximum tool-call iterations |
+
+---
+
+# Configuration Example
+
+Run against another project using a different model:
+
+```bash
+AGENT_WORKDIR=~/code/myapp \
+AGENT_MODEL=qwen2.5-coder:7b \
+python3 agent.py
 ```
-$ python3 agent.py "create a fizzbuzz.py and run it for n=15"
+
+---
+
+# Example Session
+
+```text
+$ python3 agent.py "create fizzbuzz.py and run it for n=15"
 
 ── step 1/25 ──
-tool ▸ write_file(content='def fizzbuzz(n):...', path='fizzbuzz.py')
+tool ▸ write_file(
+  path='fizzbuzz.py',
+  content='def fizzbuzz(n): ...'
+)
+
 OK: wrote 187 bytes to fizzbuzz.py
 
 ── step 2/25 ──
-tool ▸ run_bash(command='python3 -c "from fizzbuzz import fizzbuzz; fizzbuzz(15)"')
+tool ▸ run_bash(
+  command='python3 -c "from fizzbuzz import fizzbuzz; fizzbuzz(15)"'
+)
+
 exit_code: 0
+
 stdout:
 1
 2
@@ -105,20 +227,109 @@ Buzz
 FizzBuzz
 
 ── step 3/25 ──
-assistant ▸ Created fizzbuzz.py and verified output for n=15. The function
-prints Fizz/Buzz/FizzBuzz correctly.
+assistant ▸ Created fizzbuzz.py and verified output successfully.
 
 ✓ done
 ```
 
-## Troubleshooting
+---
 
-- **`cannot reach ollama at http://localhost:11434`** — start the server with `ollama serve`.
-- **`model "X" not found`** — pull it: `ollama pull X`.
-- **Tool calls never appear, model just chats** — the model probably lacks tool-calling. Check `ollama show <model>` for `tools` under Capabilities.
-- **`python: command not found` from `run_bash`** — your system only has `python3`; ask the agent to use `python3` explicitly, or symlink it.
+# Project Structure
 
-## Files
+```text
+.
+├── agent.py
+├── requirements.txt
+└── README.md
+```
 
-- `agent.py` — the entire agent (~280 lines).
-- `requirements.txt` — just `ollama>=0.4.0`.
+| File               | Purpose                   |
+| ------------------ | ------------------------- |
+| `agent.py`         | Main agent implementation |
+| `requirements.txt` | Python dependencies       |
+| `README.md`        | Documentation             |
+
+---
+
+# Troubleshooting
+
+## Cannot Reach Ollama
+
+Error:
+
+```text
+cannot reach ollama at http://localhost:11434
+```
+
+Fix:
+
+```bash
+ollama serve
+```
+
+---
+
+## Model Not Found
+
+Error:
+
+```text
+model "X" not found
+```
+
+Fix:
+
+```bash
+ollama pull X
+```
+
+---
+
+## Model Does Not Use Tools
+
+If the model only chats and never calls tools:
+
+```bash
+ollama show <model>
+```
+
+Ensure the model supports:
+
+```text
+Capabilities:
+  tools
+```
+
+---
+
+## Python Command Not Found
+
+Error:
+
+```text
+python: command not found
+```
+
+Use:
+
+```bash
+python3
+```
+
+or create a symlink if needed.
+
+---
+
+# Design Philosophy
+
+This project intentionally stays:
+
+* minimal
+* transparent
+* hackable
+* dependency-light
+* fully local
+
+The goal is to provide a simple foundation for experimenting with local coding agents powered by open models.
+
+---
