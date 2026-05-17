@@ -30,56 +30,29 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         hermit daemon (serve)                        │
-│                                                                      │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐       │
-│   │ CLI/REPL │    │ Telegram │    │ WhatsApp │    │  GChat   │       │
-│   │ channel  │    │ channel  │    │ channel  │    │ channel  │       │
-│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘       │
-│        │               │ long-poll     │ ws to         │ webhook     │
-│        │               │ /getUpdates   │ baileys       │ via tunnel  │
-│        │               │               │ bridge        │             │
-│        └────────┬──────┴───────┬───────┴───────┬───────┘             │
-│                 ▼              ▼               ▼                     │
-│            ┌───────────────────────────────────────┐                 │
-│            │      Inbound queue (asyncio.Queue)    │                 │
-│            │   items: InboundMessage(channel,peer, │                 │
-│            │                        text, attaches)│                 │
-│            └────────────────┬──────────────────────┘                 │
-│                             ▼                                        │
-│            ┌────────────────────────────────────┐                    │
-│            │  Router + Allowlist                │                    │
-│            │  - drops unknown peers (pairing)   │                    │
-│            │  - resolves (channel,peer) → sess  │                    │
-│            └────────────────┬───────────────────┘                    │
-│                             ▼                                        │
-│            ┌────────────────────────────────────────────────────┐    │
-│            │              Agent loop                            │    │
-│            │  ┌──────────────┐  ┌─────────────┐  ┌───────────┐  │    │
-│            │  │ system prompt│  │ OllamaClient│─▶│localhost: │  │    │
-│            │  │ + MEMORY.md  │  │  /api/chat  │  │   11434   │  │    │
-│            │  └──────────────┘  └─────────────┘  └───────────┘  │    │
-│            │  ┌──────────────┐  ┌────────────────────────────┐  │    │
-│            │  │ ToolRegistry │  │   SessionStore (JSON)      │  │    │
-│            │  │ read/write/  │  │   ~/.hermit/sessions/*.json│  │    │
-│            │  │ exec/fetch   │  │                            │  │    │
-│            │  └──────────────┘  └────────────────────────────┘  │    │
-│            └────────────────┬───────────────────────────────────┘    │
-│                             ▼                                        │
-│            ┌────────────────────────────────────┐                    │
-│            │      Outbound dispatcher           │                    │
-│            │  routes reply back to channel.send │                    │
-│            └────────────────────────────────────┘                    │
-└──────────────────────────────────────────────────────────────────────┘
-       │                  │                   │
-       ▼                  ▼                   ▼
-   Telegram          Baileys bridge       Cloudflare Tunnel
-   /api.bot          (Node sidecar,         (public URL →
-                      localhost:8788)        localhost:8787)
-                                                  │
-                                                  ▼
-                                          Google Chat events
+┌─────────────────────────────────────────────────────────────┐
+│                      hermit (CLI)                           │
+│                                                             │
+│   ┌────────────┐    ┌────────────┐    ┌─────────────────┐   │
+│   │  chat/run  │───▶│ AgentLoop  │───▶│ system prompt   │   │
+│   │  command   │    │            │    │ + MEMORY.md     │   │
+│   └────────────┘    │            │    └─────────────────┘   │
+│                     │            │    ┌─────────────────┐   │
+│                     │            │───▶│  OllamaClient   │───┼──▶ localhost:11434
+│                     │            │    └─────────────────┘   │
+│                     │            │    ┌─────────────────┐   │
+│                     │            │───▶│  ToolRegistry   │   │
+│                     │            │    │  (read/write/   │   │
+│                     │            │    │   exec/fetch)   │   │
+│                     │            │    └─────────────────┘   │
+│                     │            │    ┌─────────────────┐   │
+│                     │            │───▶│ SessionStore    │───┼──▶ ~/.hermit/sessions/*.json
+│                     └────────────┘    └─────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+        │                                       │
+        ▼                                       ▼
+   .env / ~/.hermit/.env              workspace/ (user files
+                                       hermit reads & writes)
 ```
 
 ---
