@@ -2,8 +2,6 @@
 
 An autonomous, privacy-first local personal agent powered by Ollama and Gemma. Talk to it from your terminal, Telegram, WhatsApp, or Google Chat — every model call stays on your machine.
 
-> **Status:** design-stage. See [`DESIGN.md`](DESIGN.md) (local agent core) and [`DESIGN-v2.md`](DESIGN-v2.md) (channels) for the full build spec. v1 ships the combination of both.
-
 ---
 
 ## Why hermit
@@ -27,23 +25,6 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
 - **Workspace containment** — file tools refuse paths that escape the configured workspace directory.
 - **Confirm gate** — destructive tools (`write_file`, `exec`) prompt for `y/n/always` before running.
 - **Ollama tool calling** with text-fenced fallback for models that don't support native function-calling.
-
-### Channels (v2 additions)
-- **Long-running daemon** (`hermit serve`) so chat channels can deliver inbound messages 24/7.
-- **`Channel` abstraction** — one tiny Protocol (`start`, `send`, `stop`) plus a shared `InboundMessage` queue. CLI, Telegram, WhatsApp, Google Chat all implement it the same way.
-- **Router with per-peer sessions** — `(channel, peer)` → session, editable via `~/.hermit/router.json`. Fuse Telegram + WhatsApp into one conversation, or keep them separate.
-- **Allowlist + DM pairing** — unknown senders get a single pairing-code reply, then are silently dropped. Approve via `hermit pair approve <CODE>`.
-- **Confirm-over-chat** — when a tool needs `y/n`, the agent sends the question as a chat message and parks the session until you reply.
-- **Telegram** — native Python (`python-telegram-bot`), long polling, no public URL required.
-- **WhatsApp** — via a local Baileys/whatsmeow bridge sidecar (wuzapi recommended). Hermit talks to the bridge over loopback; the bridge holds your linked-device session.
-- **Google Chat** — Workspace bot via service account, inbound through a Cloudflare Tunnel / Tailscale Funnel that terminates at `localhost:8787`.
-- **`exec` is off for chat channels by default.** Chat peers can read/write files; only the CLI can run shell. Toggle with `HERMIT_ALLOW_CHANNELS_TOOL_EXEC=1` at your own risk.
-
-### Operational
-- `hermit doctor` — pings Ollama, validates each enabled channel, prints workspace and state paths.
-- `hermit sessions list|show|rm|new` — inspect and manage the session log directly.
-- `hermit allow|deny <channel> <peer>` — allowlist management.
-- launchd (macOS) and systemd user-unit templates under `deploy/` for always-on hosting.
 
 ---
 
@@ -103,64 +84,6 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
 ```
 
 **One direction of dependency.** Nothing imports the CLI; nothing in the model/tool/session layers imports each other. The daemon binds `127.0.0.1` only — never `0.0.0.0`. The only inbound HTTP path is the GChat webhook, which arrives via tunnel.
-
----
-
-## Project layout
-
-```
-hermit/
-├── README.md
-├── DESIGN.md                    # v1 build spec (local agent core)
-├── DESIGN-v2.md                 # v2 build spec (channels delta)
-├── LICENSE
-├── pyproject.toml               # uv / pip-installable
-├── .env.example                 # commented env var template
-├── hermit/                      # package
-│   ├── __init__.py
-│   ├── __main__.py              # `python -m hermit` entrypoint
-│   ├── cli.py                   # click commands: chat, run, sessions, serve, allow, pair, doctor
-│   ├── config.py                # env loading, defaults
-│   ├── agent.py                 # the agent loop
-│   ├── ollama_client.py         # HTTP client for /api/chat
-│   ├── prompts.py               # build_system_prompt(...)
-│   ├── memory.py                # MEMORY.md read/update helpers
-│   ├── session.py               # JSON-backed message log
-│   ├── daemon.py                # `hermit serve` orchestrator
-│   ├── router.py                # inbound-queue consumer + session map
-│   ├── allowlist.py             # allowlist + pairing flow
-│   ├── confirm.py               # pending_confirm state, parse y/n/always
-│   ├── http_server.py           # aiohttp app for webhooks + admin API
-│   ├── tools/
-│   │   ├── __init__.py          # ToolRegistry, Tool dataclass
-│   │   ├── filesystem.py        # read_file, write_file
-│   │   ├── shell.py             # exec (confirm-gated)
-│   │   └── web.py               # fetch_url (optional, network-gated)
-│   └── channels/
-│       ├── __init__.py          # Channel Protocol, InboundMessage
-│       ├── cli.py               # wraps existing REPL behind Channel
-│       ├── telegram.py          # python-telegram-bot, long polling
-│       ├── whatsapp.py          # HTTP/WS client to local bridge
-│       └── gchat.py             # webhook receiver + REST sender
-├── tests/
-│   ├── test_agent_loop.py
-│   ├── test_tools.py
-│   ├── test_ollama_client.py    # mocked HTTP
-│   ├── test_router.py
-│   └── test_allowlist.py
-├── deploy/
-│   ├── launchd/                 # macOS plist template
-│   ├── systemd/                 # Linux user-unit template
-│   └── whatsapp-bridge/         # docker-compose for wuzapi, sample env
-├── docs/
-│   ├── telegram-setup.md        # BotFather, token, group caveats
-│   ├── whatsapp-bridge.md       # bridge sidecar setup
-│   └── gchat-setup.md           # GCP + tunnel walk-through
-└── workspace/                   # default workspace dir (gitignored)
-    └── MEMORY.md                # user-editable persistent memory
-```
-
-**~1700-2100 LOC for v1 of the combined spec.** If a file grows past ~300 lines, suspect it's doing too much.
 
 ---
 
@@ -321,21 +244,6 @@ HERMIT_PAIRING_TTL_SEC=600
 
 # --- Safety ---
 HERMIT_ALLOW_CHANNELS_TOOL_EXEC=0     # chat channels can't run `exec` unless 1
-
-# --- Telegram ---
-HERMIT_TELEGRAM_ENABLED=0
-HERMIT_TELEGRAM_TOKEN=                # from @BotFather
-
-# --- WhatsApp ---
-HERMIT_WHATSAPP_ENABLED=0
-HERMIT_WHATSAPP_BRIDGE_URL=http://localhost:8788
-HERMIT_WHATSAPP_BRIDGE_TOKEN=
-
-# --- Google Chat ---
-HERMIT_GCHAT_ENABLED=0
-HERMIT_GCHAT_SA_KEYFILE=~/.hermit/secrets/gchat-sa.json
-HERMIT_GCHAT_WEBHOOK_AUDIENCE=        # your tunnel URL
-HERMIT_GCHAT_BOT_NAME=hermit
 ```
 
 ---
@@ -386,80 +294,3 @@ hermit router pin telegram 123456789 <session_id>
 ```bash
 hermit doctor    # pings Ollama, validates each enabled channel
 ```
-
----
-
-## Security model
-
-Hermit assumes its host machine is the trust boundary. From that follow a few hard rules:
-
-- **CLI is the trust root.** Anyone with terminal access on the host is already trusted. The CLI channel is always allowlisted; `exec` is always available from it.
-- **Chat peers are restricted by default.** An allowlisted peer can read files, write files, and (optionally) fetch URLs. They cannot run `exec` unless `HERMIT_ALLOW_CHANNELS_TOOL_EXEC=1` is set. They cannot drive hermit at all until they've been pair-approved.
-- **The daemon binds loopback only.** `HERMIT_DAEMON_BIND=127.0.0.1:8787`. Inbound HTTP for Google Chat arrives via Cloudflare Tunnel / Tailscale Funnel — never by exposing hermit on a public interface.
-- **Pairing is single-shot.** An unknown peer gets exactly one pairing-code reply, then further messages are silently dropped until the operator approves the code. No spam vector.
-- **The confirm gate trusts the transport.** If your Telegram account is compromised, the attacker can reply `yes` to a confirm prompt. Hermit cannot independently verify "this is really you." Don't run hermit if you don't trust your messenger logins.
-- **No sandboxing.** Tools run on the host with the same permissions as the daemon. This is the privacy-first trade-off (no Docker dep). If you ever want to isolate `exec`, the cleanest patch is a `--sandbox podman` flag that swaps the handler.
-- **WhatsApp bridge ToS risk.** Running a Baileys/whatsmeow bridge on a personal WhatsApp account is technically against WhatsApp's terms. Risk is low for low-volume personal use; non-zero. Don't use this for a public bot. WhatsApp Web sessions are also subject to periodic forced re-pair (~every 2 weeks idle).
-
----
-
-## Channel quick reference
-
-| Channel | Inbound transport | Outbound | Sidecar | Public URL? | Notes |
-|---|---|---|---|---|---|
-| CLI | Local REPL | stdout | — | No | Trust root |
-| Telegram | Long polling | Bot API | — | No | Easiest. Get token from @BotFather |
-| WhatsApp | Local bridge (HTTP+WS) | Local bridge | wuzapi / Baileys / whatsmeow | No | Scan QR with phone on bridge first run |
-| Google Chat | Webhook | REST + SA JWT | Cloudflare Tunnel / Tailscale Funnel | Yes (via tunnel) | Workspace only; personal Gmail not supported |
-
----
-
-## Memory and personality files
-
-In your workspace directory:
-
-- **`MEMORY.md`** (user-editable) — durable preferences, past decisions, behavioral guidelines. Loaded into every system prompt. The agent may suggest edits; you execute them. Cap ~4KB before considering archival to `MEMORY.archive.md`.
-- **`SOUL.md`** (optional) — tone/personality overlay. Cap ~1KB.
-
-Both files are plain Markdown. No embeddings, no RAG, no summarization. Hermit reads them on every turn.
-
----
-
-## Build order
-
-The design docs lay out an inside-out build order. Summary:
-
-1. `ollama_client.py` + smoke test — confirm your model tag actually works.
-2. `session.py` + tests — atomic round-trip.
-3. `tools/filesystem.py` — workspace containment edge cases.
-4. `prompts.py` — system prompt assembly.
-5. `agent.py` — the loop, mocks first then real Ollama.
-6. `cli.py` — `hermit run` first, then `chat`, then `sessions`.
-7. `tools/shell.py` — `exec` with confirm gate.
-8. `MEMORY.md` flow end-to-end.
-9. *(v2)* `daemon.py` + CLI channel through the queue.
-10. *(v2)* Allowlist + pairing primitives.
-11. *(v2)* Telegram end-to-end (proves the channel architecture).
-12. *(v2)* Confirm-over-chat.
-13. *(v2)* WhatsApp via local bridge.
-14. *(v2)* Google Chat last (GCP + tunnel setup can eat an afternoon).
-
-If you finish 1–8 you have v1 of v2's CLI experience. 9–12 give you Telegram. 13–14 are real work; do them only if you actually live in those apps.
-
----
-
-## Roadmap
-
-| Version | What lands |
-|---|---|
-| v1 (combined) | Local CLI agent + daemon + Telegram + WhatsApp + Google Chat + allowlist + pairing + confirm-over-chat |
-| v1.1 | Per-peer tool restrictions; Gmail-as-channel for personal accounts; advisory file locks on session writes |
-| v1.2 | Reply threading, attachment passthrough, streaming responses to chat |
-| v1.3 | Inbound image support (multimodal Ollama model); voice transcription via local Whisper sidecar |
-| v2 (maybe) | MCP server-mode so other clients can use hermit's tools; remote-but-trusted access via Tailscale + token |
-
----
-
-## License
-
-MIT. See [`LICENSE`](LICENSE).
