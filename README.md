@@ -1,6 +1,6 @@
 # hermit
 
-An autonomous, privacy-first local personal agent powered by Ollama and Gemma. Talk to it from your terminal, Telegram, WhatsApp, or Google Chat — every model call stays on your machine.
+An autonomous, privacy-first local personal agent powered by Ollama and Gemma. Talk to it from your terminal every model call stays on your machine.
 
 ---
 
@@ -10,7 +10,6 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
 - **Single user.** No auth, no multi-tenancy. Your machine is the trust boundary.
 - **Transparent state.** Sessions, memory, and config are human-readable files (`.json`, `.md`, `.env`). `cat`, `git diff`, and `vim` work.
 - **Small, replaceable core.** Model client, tool registry, session store, and each channel are one file behind a tiny interface. Swap Ollama for llama.cpp later in a 50-line patch.
-- **Chat-from-anywhere.** One agent, four front-ends (CLI, Telegram, WhatsApp, Google Chat). Same session can be driven from any of them.
 
 ---
 
@@ -83,8 +82,6 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
                                           Google Chat events
 ```
 
-**One direction of dependency.** Nothing imports the CLI; nothing in the model/tool/session layers imports each other. The daemon binds `127.0.0.1` only — never `0.0.0.0`. The only inbound HTTP path is the GChat webhook, which arrives via tunnel.
-
 ---
 
 ## Requirements
@@ -92,9 +89,6 @@ An autonomous, privacy-first local personal agent powered by Ollama and Gemma. T
 - **Python 3.11+**
 - **[Ollama](https://ollama.com)** running locally with a tool-calling-capable model pulled.
   - Default in `.env.example` is `AGENT_MODEL=gemma4:e4b`. Verify the tag with `ollama list`. If it's not on your machine, `gemma3:4b`, `gemma3n:e4b`, or `qwen2.5:7b-instruct` are good substitutes.
-- **(Optional, for WhatsApp)** A Baileys/whatsmeow bridge — e.g. [`wuzapi`](https://github.com/asternic/wuzapi). Runs as a separate process on `localhost:8788`.
-- **(Optional, for Google Chat)** A GCP project with Google Chat API enabled, a service account, and [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or `tailscale funnel` for the inbound webhook.
-- **(Optional, for Telegram)** A bot token from [`@BotFather`](https://t.me/BotFather).
 
 ---
 
