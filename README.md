@@ -175,17 +175,6 @@ pip install -e ".[dev]"            # picks up any new deps from pyproject.toml
 pytest -q                          # confirm nothing regressed (38 tests)
 ```
 
-### Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `command not found: hermit` | `source .venv/bin/activate` (or use `.venv/bin/hermit` directly). |
-| `ModuleNotFoundError: No module named 'hermit'` from `python hermit/agent.py` | Don't run module files directly. Use the `hermit` CLI. |
-| `Failed to connect to localhost port 11434` | Ollama isn't running. `brew services start ollama` (or `ollama serve` in a terminal). |
-| `model 'gemma4:e4b' not found` | `ollama list` to see what you have; edit `.env` to match. Or `ollama pull <tag>`. |
-| `hermit run` returns empty / loops | Make sure your model supports tool calling. `gemma3:4b`, `gemma3n:e4b`, `qwen2.5:7b-instruct`, and the `llama3.1` family all do. Smaller/older models often don't. |
-| `externally-managed-environment` from `pip install` | You're not in a venv. Run `source .venv/bin/activate` first. |
-
 ---
 
 ## Configuration
